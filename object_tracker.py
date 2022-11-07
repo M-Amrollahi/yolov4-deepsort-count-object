@@ -36,7 +36,7 @@ flags.DEFINE_float('iou', 0.45, 'iou threshold')
 flags.DEFINE_float('score', 0.50, 'score threshold')
 flags.DEFINE_boolean('dont_show', False, 'dont show video output')
 flags.DEFINE_boolean('info', False, 'show detailed info of tracked objects')
-flags.DEFINE_boolean('count', False, 'count objects being tracked on screen')
+flags.DEFINE_boolean('count', True, 'count objects being tracked on screen')
 
 def main(_argv):
     # Definition of the parameters
@@ -92,8 +92,15 @@ def main(_argv):
 
     frame_num = 0
     # while video is running
+
+    dict_count = dict()
+    line_count = ((200,800),(2000,800))
     while True:
         return_value, frame = vid.read()
+
+        ##-me added line to frame for counting
+        cv2.line(frame,line_count[0],line_count[1],(0,0,255),5)
+        
         if return_value:
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             image = Image.fromarray(frame)
@@ -160,7 +167,7 @@ def main(_argv):
         allowed_classes = list(class_names.values())
         
         # custom allowed classes (uncomment line below to customize tracker for only people)
-        #allowed_classes = ['person']
+        allowed_classes = ['person']
 
         # loop through objects and use class index to get class name, allow only classes in allowed_classes list
         names = []
@@ -175,7 +182,7 @@ def main(_argv):
         names = np.array(names)
         count = len(names)
         if FLAGS.count:
-            cv2.putText(frame, "Objects being tracked: {}".format(count), (5, 35), cv2.FONT_HERSHEY_COMPLEX_SMALL, 2, (0, 255, 0), 2)
+            cv2.putText(frame, "Objects being tracked: {}".format(len(dict_count.keys())), (5, 35), cv2.FONT_HERSHEY_COMPLEX_SMALL, 2, (0, 255, 0), 2)
             print("Objects being tracked: {}".format(count))
         # delete detections that are not in allowed_classes
         bboxes = np.delete(bboxes, deleted_indx, axis=0)
@@ -207,6 +214,9 @@ def main(_argv):
             bbox = track.to_tlbr()
             class_name = track.get_class()
             
+            ##-me limit the counts inside the line
+            #if int(bbox[1])<line_count[0][1]:
+            #    continue
         # draw bbox on screen
             color = colors[int(track.track_id) % len(colors)]
             color = [i * 255 for i in color]
@@ -214,6 +224,11 @@ def main(_argv):
             cv2.rectangle(frame, (int(bbox[0]), int(bbox[1]-30)), (int(bbox[0])+(len(class_name)+len(str(track.track_id)))*17, int(bbox[1])), color, -1)
             cv2.putText(frame, class_name + "-" + str(track.track_id),(int(bbox[0]), int(bbox[1]-10)),0, 0.75, (255,255,255),2)
 
+            ##-me how many times an object has been seen  
+            if dict_count.get(track.track_id) == None:
+                dict_count[track.track_id] = 0
+            else:
+                dict_count[track.track_id] += 1
         # if enable info flag then print details about each track
             if FLAGS.info:
                 print("Tracker ID: {}, Class: {},  BBox Coords (xmin, ymin, xmax, ymax): {}".format(str(track.track_id), class_name, (int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3]))))
@@ -231,6 +246,8 @@ def main(_argv):
         if FLAGS.output:
             out.write(result)
         if cv2.waitKey(1) & 0xFF == ord('q'): break
+    
+    print("object counts:",dict_count)
     cv2.destroyAllWindows()
 
 if __name__ == '__main__':
